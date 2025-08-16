@@ -18,8 +18,8 @@ def predict_openai(model, instruction, text):
 
 if __name__ == '__main__':
     # 实例化Qwen-1.8B模型以及Tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("Qwen-1_8-chat/", trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained("Qwen-1_8-chat/", device_map="cuda:1", trust_remote_code=True).eval()
+    tokenizer = AutoTokenizer.from_pretrained("Qwen-1_8-chat", trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained("Qwen-1_8-chat", device_map="cuda:1", trust_remote_code=True).eval()
     print('开始对对话内容进行要素抽取，输入CTRL+C，则退出')
     while True:
         # 输入提示词内容和对话内容
