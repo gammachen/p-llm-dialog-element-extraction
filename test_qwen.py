@@ -19,8 +19,10 @@ def predict_openai(model, instruction, text):
 
 if __name__ == '__main__':
     # 实例化Qwen-1.8B模型以及Tokenizer（使用modelscope）
-    tokenizer = AutoTokenizer.from_pretrained("qwen/Qwen-1_8B-Chat", trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained("qwen/Qwen-1_8B-Chat", device_map="cuda:1", trust_remote_code=True).eval()
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen-1_8B-Chat", trust_remote_code=True)
+    # 检查是否有可用的GPU，如果没有则使用CPU
+    device = "cuda:1" if torch.cuda.is_available() else "cpu"
+    model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen-1_8B-Chat", device_map=device, trust_remote_code=True).eval()
     print('开始对对话内容进行要素抽取，输入CTRL+C，则退出')
     while True:
         # 输入提示词内容和对话内容
