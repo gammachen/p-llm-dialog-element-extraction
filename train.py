@@ -114,9 +114,24 @@ def train():
     
     # 判断是多卡训练还是单卡训练，local_rank为-1表示单卡训练
     if args.local_rank == -1:
-        # 单卡训练，直接使用cuda设备
-        device = torch.device("cuda")
+        # 单卡训练，自动检测设备类型
+        if torch.backends.mps.is_available():
+            # 使用MPS (Metal Performance Shaders) for Apple Silicon
+            device = torch.device("mps")
+            print("Using MPS device")
+        elif torch.cuda.is_available():
+            # 使用CUDA (NVIDIA GPU)
+            device = torch.device("cuda")
+            print("Using CUDA device")
+        else:
+            # 使用CPU
+            device = torch.device("cpu")
+            print("Using CPU device")
     else:
+        # 多卡训练，检查是否支持CUDA
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA is not available, cannot use multi-GPU training")
+        
         # 多卡训练，设置当前进程使用的GPU设备
         torch.cuda.set_device(args.local_rank)
         # 创建指定GPU的cuda设备对象
@@ -125,7 +140,10 @@ def train():
         deepspeed.init_distributed()
     
     # 获取当前进程的全局rank
-    args.global_rank = torch.distributed.get_rank()
+    if torch.cuda.is_available() or args.local_rank == -1:
+        args.global_rank = 0 if args.local_rank == -1 else torch.distributed.get_rank()
+    else:
+        args.global_rank = 0
     
     # 设置tensorboard，只在主进程上记录训练过程中的loss以及ppl
     if args.global_rank <= 0:
@@ -144,8 +162,13 @@ def train():
     tokenizer.pad_token_id = tokenizer.eod_id
     
     # 加载千问模型
-    # 设置设备映射，使用环境变量中的LOCAL_RANK或默认为0
-    device_map = {'': int(os.environ.get('LOCAL_RANK', '0'))}
+    # 设置设备映射，根据可用设备选择合适的映射方式
+    if device.type == "cuda":
+        # CUDA设备使用环境变量中的LOCAL_RANK或默认为0
+        device_map = {'': int(os.environ.get('LOCAL_RANK', '0'))}
+    else:
+        # MPS或CPU设备直接映射到对应设备
+        device_map = {'': device}
     
     # 从预训练模型路径加载模型配置
     model_config = QWenConfig.from_pretrained(args.model_name_or_path)
@@ -203,7 +226,7 @@ def train():
     test_dataset = QwenPromptDataSet(args.test_path, tokenizer, args.max_len, args.max_src_len, args.is_skip)
     
     # 根据是否为分布式训练设置不同的采样器
-    if args.local_rank == -1:
+    if args.local_rank == -1 or not torch.cuda.is_available():
         # 单卡训练使用随机采样器和顺序采样器
         train_sampler = RandomSampler(train_dataset)
         test_sampler = SequentialSampler(test_dataset)
